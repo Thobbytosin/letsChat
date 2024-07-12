@@ -8,30 +8,24 @@ import cookieParser from "cookie-parser";
 
 dotenv.config();
 
-// CONNECT TO DATABASE
-mongoose
-  .connect(process.env.MONGODB_URL)
-  .then(() => {
-    console.log("Connected to Database");
-  })
-  .catch((error) => {
-    console.log("Something went wrong: ", error);
-  });
-
 const app = express();
 
-app.use(express.json()); //to allow json parsing
-app.use(cookieParser()); // to allow cookie parsing
-
-// ROUTES
-app.use("/api/auth", authRouter);
-
+// cors to communicate with frontend
 app.use(
   cors({
     origin: process.env.FRONTEND_URL,
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
+
+//to allow json parsing
+app.use(express.json());
+// to allow cookie parsing
+app.use(cookieParser());
+
+// ROUTES
+app.use("/api/auth", authRouter);
 
 // MIDDLEWARE FOR ERROR(INCASE THE DATA IS NOT FETCH)
 app.use((err, res) => {
@@ -55,3 +49,13 @@ const PORT = 8080;
 app.listen(PORT, () => {
   console.log("Server is running at " + PORT);
 });
+
+// CONNECT TO DATABASE
+mongoose
+  .connect(process.env.MONGODB_URL)
+  .then(() => {
+    console.log("Connected to Database");
+  })
+  .catch((error) => {
+    console.log("Something went wrong: ", error);
+  });

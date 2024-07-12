@@ -7,19 +7,30 @@ import { isValidObjectId } from "mongoose";
 
 export const signUp = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { userName, email, password } = req.body;
 
     // check if all fields are filled
     if (
-      !name ||
+      !userName ||
       !email ||
       !password ||
-      name.trim() === "" ||
+      userName.trim() === "" ||
       email.trim() === "" ||
-      password.trim() === ""
+      password === ""
     ) {
       return errorHandler(res, 400, "All fields are requird");
     }
+
+    // check if userName already exists
+    const userNameExists = await User.findOne({ userName });
+
+    // if email already exists, return this message to the user, else continue
+    if (userNameExists)
+      return errorHandler(
+        res,
+        401,
+        "UserName already exists. Please choose a another suggestion"
+      );
 
     // check if email already exists
     const emailExists = await User.findOne({ email });
@@ -51,7 +62,7 @@ export const signUp = async (req, res, next) => {
 
     // create a new user
     const user = new User({
-      name: name.trim(),
+      userName: userName.trim(),
       email: email.trim(),
       password: hashedPassword,
     });
@@ -59,10 +70,44 @@ export const signUp = async (req, res, next) => {
     //  save it in the database
     await user.save();
 
+    // create a access token for the user
+    // sign in jsonwebtoken
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY);
+
+    // save token in cookie
+    res.cookie("access_token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    });
+
     // send success response
-    res
-      .status(201)
-      .json({ message: "Account created successfully", data: user });
+    res.status(201).json({
+      success: true,
+      message: "Account created successfully",
+      profile: {
+        id: user.id,
+        userName: user.userName,
+        email: user.email,
+        profileSetup: user.profileSetup,
+        verified: user.verified,
+      },
+    });
+
+    // save the access token to the db
+    if (!user.tokens) user.tokens = [token];
+    else user.tokens.push(token);
+
+    // update database
+    await user.save();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateUserDetails = async (req, res, next) => {
+  try {
+    const { username, name, avatar } = req.body;
   } catch (error) {
     next(error);
   }
@@ -93,6 +138,9 @@ export const signIn = async (req, res, next) => {
     if (!user.tokens) user.tokens = [token];
     else user.tokens.push(token);
 
+    // also update the verified status to true
+    user.verified = true;
+
     await user.save();
 
     // send response back
@@ -102,12 +150,16 @@ export const signIn = async (req, res, next) => {
       .json({
         message: "Signed successfully",
         accessToken: token,
+        success: true,
         profile: {
           id: user._id,
+          userName: user.userName,
           name: user.name,
           email: user.email,
           verified: user.verified,
           avatar: user.avatar,
+          profileSetup: user.profileSetup,
+          color: user.color,
         },
       });
   } catch (error) {
@@ -134,7 +186,7 @@ export const signOut = async (req, res, next) => {
 
     // send response
     res.status(200).json({
-      message: `Signed out. Hope to see you soon ${user?.name}`,
+      message: `Signed out. Hope to see you soon ${user?.userName}`,
     });
   } catch (error) {
     next(error);
