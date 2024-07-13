@@ -9,6 +9,7 @@ export default {
         gray: "#9ca3af",
         warning: "#ef4444",
         success: "#22c55e",
+        backgroundGray: "#f1f5f9",
       },
       fontFamily: {
         outfit: ["Outfit", "sans-serif"],

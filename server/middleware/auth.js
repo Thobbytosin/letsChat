@@ -1,38 +1,34 @@
 import { errorHandler } from "../utils/error.js";
 import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
-import pkg from "jsonwebtoken";
 
-const { JsonWebTokenError, TokenExpiredError } = pkg;
+// Middleware to check for access token: I.E IF USER IS SIGNED IN
+export const checkAuth = async (req, res, next) => {
+  const token = req.cookies.accessToken;
 
-export const isAuth = async (res, req, next) => {
+  if (!token) {
+    return errorHandler(res, 401, "Access Denied: No Token Provided!");
+  }
+
   try {
-    const authToken = req.req.headers.authorization;
-    if (!authToken) return next(errorHandler(403, "unauthorized request"));
+    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
 
-    const token = authToken.split("Bearer ")[1];
-    const payload = jwt.verify(token, process.env.JWT_SECRET_KEY);
-
-    const user = await User.findById(payload.id);
-    if (!user) return next(errorHandler(404, "User does not exist"));
+    const user = await User.findOne({ email: decoded.email });
+    if (!user) return errorHandler(res, 404, "User does not exist");
 
     req.user = {
-      id: user._id,
+      id: user.id,
       name: user.name,
+      userName: user.userName,
       email: user.email,
       verified: user.verified,
+      profileSetup: user.profileSetup,
       avatar: user.avatar,
-      accessToken: token,
+      color: user.color,
     };
 
     next();
-  } catch (error) {
-    if (error instanceof TokenExpiredError) {
-      return next(errorHandler(401, "Session expired"));
-    }
-    if (error instanceof JsonWebTokenError)
-      return next(errorHandler(401, "Unauthorized"));
-
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };

@@ -72,10 +72,14 @@ export const signUp = async (req, res, next) => {
 
     // create a access token for the user
     // sign in jsonwebtoken
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY);
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET_KEY
+    );
 
     // save token in cookie
-    res.cookie("access_token", token, {
+    res.cookie("accessToken", token, {
+      // maxAge: 48 * 60 * 60 * 1000, // 2 day expiration
       httpOnly: true,
       secure: true,
       sameSite: "None",
@@ -91,6 +95,7 @@ export const signUp = async (req, res, next) => {
         email: user.email,
         profileSetup: user.profileSetup,
         verified: user.verified,
+        avatar: user.avatar,
       },
     });
 
@@ -100,14 +105,6 @@ export const signUp = async (req, res, next) => {
 
     // update database
     await user.save();
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updateUserDetails = async (req, res, next) => {
-  try {
-    const { username, name, avatar } = req.body;
   } catch (error) {
     next(error);
   }
@@ -132,7 +129,7 @@ export const signIn = async (req, res, next) => {
     if (!checkPassword) return errorHandler(res, 422, "Invalid credentials");
 
     // sign in jsonwebtoken
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY);
+    const token = jwt.sign({ id: user.id, email }, process.env.JWT_SECRET_KEY);
 
     // save the access token to the db
     if (!user.tokens) user.tokens = [token];
@@ -141,27 +138,32 @@ export const signIn = async (req, res, next) => {
     // also update the verified status to true
     user.verified = true;
 
+    // save in database
     await user.save();
 
+    // save token in cookie
+    res.cookie("accessToken", token, {
+      // maxAge: 48 * 60 * 60 * 1000, // 2 day expiration
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    });
+
     // send response back
-    res
-      .status(200)
-      .cookie("access_token", token, { httpOnly: true, secure: true })
-      .json({
-        message: "Signed successfully",
-        accessToken: token,
-        success: true,
-        profile: {
-          id: user._id,
-          userName: user.userName,
-          name: user.name,
-          email: user.email,
-          verified: user.verified,
-          avatar: user.avatar,
-          profileSetup: user.profileSetup,
-          color: user.color,
-        },
-      });
+    res.status(200).json({
+      message: "Signed successfully",
+      success: true,
+      profile: {
+        id: user._id,
+        userName: user.userName,
+        name: user.name,
+        email: user.email,
+        verified: user.verified,
+        avatar: user.avatar,
+        profileSetup: user.profileSetup,
+        color: user.color,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -170,7 +172,7 @@ export const signIn = async (req, res, next) => {
 export const signOut = async (req, res, next) => {
   try {
     const { accessToken } = req.body;
-    const user = await User.findOne({ _id: res.user.id, tokens: accessToken });
+    const user = await User.findOne({ _id: req.user.id, tokens: accessToken });
     if (!user)
       return errorHandler(res, 401, "You must be logged into sign out");
 
@@ -182,7 +184,7 @@ export const signOut = async (req, res, next) => {
     await user.save();
 
     // remove token from cookies
-    res.clearCookie("access_token");
+    res.clearCookie("accessToken");
 
     // send response
     res.status(200).json({
@@ -195,65 +197,61 @@ export const signOut = async (req, res, next) => {
 
 export const sendProfile = async (req, res, next) => {
   try {
-    res.status(200).json({
-      profile: {
-        id: res.user.id,
-        name: res.user.name,
-        email: res.user.email,
-        avatar: res.user.avatar,
-        verified: res.user.verified,
-      },
-    });
+    // res.status(200).json({ success: true, profile: req.user });
+    res.status(200).json({ success: true, profile: req.user });
   } catch (error) {
     next(error);
   }
 };
 
-export const updateUserName = async (req, res, next) => {
+export const updateProfile = async (req, res, next) => {
   try {
     // get the user id
     const { id } = req.params;
 
-    if (!isValidObjectId(id)) return errorHandler(res, 404, "Invaid Id");
-
-    // the fields to be updated
-    const { name } = req.body;
-
-    // find the user with id
-    const user = await User.findOne({
-      _id: res.user.id,
-      tokens: res.user.accessToken,
-    });
-    if (!user) return errorHandler(res, 404, "User not found");
-
-    // // you should also be ble to update only your account
-    // if (res.user.id !== id) return errorHandler(res, 403, "Permission denied");
-
-    // validate the name input
-    if (!name || name.trim() === "")
-      return errorHandler(res, 422, "Name field is required");
-
-    // check if new name is the same as existing name
-    if (name === user.name)
+    // check if the user is the owner of the account
+    if (id !== req.user.id)
       return errorHandler(
         res,
-        422,
-        "Name must be different from existing name"
+        403,
+        "Access denied: You have not been authorized to access this"
       );
 
-    // set new name
-    user.name = name.trim();
-    // save new name in database
-    await user.save();
+    // the fields to be updated
+    const { name, userName, color } = req.body;
+
+    console.log(name, userName, color);
+
+    // validate the name input
+    if (!name || name.trim() === "" || !userName || userName.trim() === "")
+      return errorHandler(res, 422, "All fields are required");
+
+    // find the user with id and update
+    const user = await User.findByIdAndUpdate(
+      id,
+      {
+        name,
+        userName,
+        color,
+        profileSetup: true,
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) return errorHandler(res, 404, "User not found");
 
     res.status(200).json({
-      message: "Username updated",
+      success: true,
+      message: "Your Profile has been updated ",
       profile: {
-        id: user._id,
+        id: user.id,
         name: user.name,
+        userName: user.userName,
         email: user.email,
         verified: user.verified,
+        profileSetup: user.profileSetup,
         avatar: user.avatar,
+        color: user.color,
       },
     });
   } catch (error) {

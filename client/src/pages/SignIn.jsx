@@ -5,9 +5,10 @@ import {
   AiOutlineArrowLeft,
 } from "react-icons/ai";
 import toast from "react-hot-toast";
-import client from "../../lib/client";
-import { SIGNIN_ROUTE } from "../../utils/constants";
+import client from "../lib/client";
+import { SIGNIN_ROUTE } from "../utils/constants";
 import { useNavigate } from "react-router-dom";
+import { useAppStore } from "../store";
 
 const SignIn = () => {
   const initialValues = {
@@ -21,6 +22,7 @@ const SignIn = () => {
   const [loading, setLoading] = useState(false);
   const [invalidCredentialsError, setinvalidCredentialsError] = useState(false);
   const navigate = useNavigate();
+  const { setUserInfo } = useAppStore();
 
   const validateSignIn = () => {
     if (!formData.email.length && !formData.password.length) {
@@ -73,7 +75,9 @@ const SignIn = () => {
 
         if (data.profileSetup) {
           setSuccess(data.message);
-          console.log(data.profile);
+
+          // update state
+          setUserInfo(data.profile);
 
           const timer = setTimeout(() => {
             navigate("/chats");
@@ -82,7 +86,9 @@ const SignIn = () => {
           }, 2500);
         } else {
           setSuccess(data.message);
-          console.log(data.profile);
+
+          // update state
+          setUserInfo(data.profile);
 
           const timer = setTimeout(() => {
             navigate("/profile");
@@ -92,21 +98,18 @@ const SignIn = () => {
         }
       }
     } catch (error) {
+      setLoading(false);
       console.log("ERROR:", error);
       setError(error.response.data.message);
       toast.error(error.response.data.message);
       if (error.response.data.message === "Invalid credentials") {
         setinvalidCredentialsError(true);
       }
-    } finally {
-      setLoading(false);
     }
-
-    return setLoading(false);
   };
 
   return (
-    <div className="p-6 font-poppins bg-slate-100 min-h-screen w-screen">
+    <div className="p-6 font-poppins bg-slate-100 min-h-screen w-screen relative">
       <button onClick={() => navigate(-1)}>
         <AiOutlineArrowLeft size={24} />
       </button>
@@ -186,12 +189,23 @@ const SignIn = () => {
           <button
             disabled={loading}
             onSubmit={handleSubmit}
-            className="bg-blue-gradient text-white font-medium  px-24 text-center text-lg rounded-xl py-2 "
+            className="bg-blue-gradient text-white px-24 text-center text-sm rounded-xl py-2.5 "
           >
             {loading ? "Loading..." : "Sign In"}
           </button>
         </div>
       </form>
+      <p className=" font-light text-sm mt-20 text-center">
+        Don't Have an account?
+        <span className=" ml-2 font-medium underline">
+          <button onClick={() => navigate("/register")} className=" underline">
+            Sign Up
+          </button>
+        </span>
+      </p>
+
+      {/* LOADING SPINNER */}
+      {loading && <Spinner />}
     </div>
   );
 };

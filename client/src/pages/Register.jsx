@@ -5,9 +5,11 @@ import {
   AiOutlineArrowLeft,
 } from "react-icons/ai";
 import toast from "react-hot-toast";
-import client from "../../lib/client";
-import { SIGNUP_ROUTE } from "../../utils/constants";
+import client from "../lib/client";
+import { SIGNUP_ROUTE } from "../utils/constants";
 import { useNavigate } from "react-router-dom";
+import { useAppStore } from "../store";
+import Spinner from "./ui/Spinner";
 
 const Register = () => {
   const initialValues = {
@@ -26,6 +28,7 @@ const Register = () => {
   const [userNameExistsAlready, setUserNameExistsAlready] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { setUserInfo } = useAppStore();
 
   const validateSignup = () => {
     if (
@@ -100,6 +103,9 @@ const Register = () => {
           toast.success(data.message);
           setSuccess(data.message);
 
+          // update state
+          setUserInfo(data.profile);
+
           const timer = setTimeout(() => {
             navigate("/profile");
 
@@ -131,7 +137,7 @@ const Register = () => {
   };
 
   return (
-    <div className="p-6 font-poppins bg-slate-100 min-h-screen w-screen">
+    <div className="p-6 font-poppins bg-slate-100 min-h-screen w-screen relative">
       <button onClick={() => navigate(-1)}>
         <AiOutlineArrowLeft size={24} />
       </button>
@@ -258,12 +264,23 @@ const Register = () => {
           <button
             disabled={loading}
             onSubmit={handleSubmit}
-            className="bg-blue-gradient text-white font-medium  px-24 text-center text-lg rounded-xl py-2 "
+            className="bg-blue-gradient text-white  px-24 text-center text-sm rounded-xl py-2.5 "
           >
-            {loading ? "Loading..." : "Sign Up"}
+            Sign Up
           </button>
         </div>
       </form>
+      <p className=" font-light text-sm mt-3 text-center">
+        Already Have an account?
+        <span className=" ml-2 font-medium underline">
+          <button onClick={() => navigate("/sign-in")} className=" underline">
+            Sign In
+          </button>
+        </span>
+      </p>
+
+      {/* LOADING SPINNER */}
+      {loading && <Spinner />}
     </div>
   );
 };

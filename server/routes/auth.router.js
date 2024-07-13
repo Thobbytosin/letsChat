@@ -4,16 +4,16 @@ import {
   signIn,
   signOut,
   signUp,
-  updateUserName,
+  updateProfile,
 } from "../controllers/auth.controller.js";
-import { isAuth } from "../middleware/auth.js";
+import { checkAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.post("/signup", signUp);
 router.post("/signin", signIn);
-router.post("/signout", isAuth, signOut);
-router.get("/getProfile", isAuth, sendProfile);
-router.post("/updateUsername/:id", isAuth, updateUserName);
+router.post("/signout", checkAuth, signOut);
+router.get("/getProfile", checkAuth, sendProfile);
+router.post("/updateProfile/:id", checkAuth, updateProfile);
 
 export default router;
