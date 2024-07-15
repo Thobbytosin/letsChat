@@ -23,13 +23,13 @@ const Home = () => {
     >
       {/* SLIDER */}
       <div
-        className=" flex transition-all "
+        className=" flex transition-all duration-1000 "
         style={{
           transform: `translateX(-${currentIndex * 100}%)`,
         }}
       >
         {/* SLIDE 1 */}
-        <div className=" relative min-w-full h-screen flex flex-col justify-evenly items-center">
+        <div className=" transition-all  relative min-w-full h-screen flex flex-col justify-evenly items-center">
           <div className=" font-poppins text-white ">
             <h2 className=" text-center text-[3rem] md:text-[6rem] font-medium flex gap-2">
               <span>LetsChat</span>
@@ -49,7 +49,7 @@ const Home = () => {
         </div>
 
         {/* SLIDE 2 */}
-        <div className=" bgImage relative min-w-full h-screen font-poppins flex flex-col justify-start text-white p-6">
+        <div className=" transition-all  bgImage relative min-w-full h-screen font-poppins flex flex-col justify-start text-white p-6">
           {/* OVERLAY */}
           <div className=" min-w-full h-full bg-black bg-opacity-55 absolute left-0 top-0" />
           {/* TITLE */}

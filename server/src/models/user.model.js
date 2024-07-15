@@ -33,8 +33,16 @@ const userSchema = new mongoose.Schema(
       required: false,
     },
     avatar: {
+      id: {
+        type: String,
+        required: false,
+      },
+      url: {
+        type: String,
+      },
+    },
+    noAvatar: {
       type: String,
-      required: false,
       default:
         "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png",
     },

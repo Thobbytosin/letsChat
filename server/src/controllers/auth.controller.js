@@ -1,9 +1,9 @@
-import User from "../models/user.model.js";
-import { errorHandler } from "../utils/error.js";
 import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { isPasswordStrong } from "../utils/helpers.js";
-import { isValidObjectId } from "mongoose";
+import User from "../models/user.model.js";
+import { errorHandler } from "../utils/error.js";
+import cloudUploader, { cloudApi } from "../cloud/index.js";
 
 export const signUp = async (req, res, next) => {
   try {
@@ -96,6 +96,7 @@ export const signUp = async (req, res, next) => {
         profileSetup: user.profileSetup,
         verified: user.verified,
         avatar: user.avatar,
+        noAvatar: user.noAvatar,
       },
     });
 
@@ -162,6 +163,7 @@ export const signIn = async (req, res, next) => {
         avatar: user.avatar,
         profileSetup: user.profileSetup,
         color: user.color,
+        noAvatar: user.noAvatar,
       },
     });
   } catch (error) {
@@ -220,11 +222,21 @@ export const updateProfile = async (req, res, next) => {
     // the fields to be updated
     const { name, userName, color } = req.body;
 
-    console.log(name, userName, color);
-
     // validate the name input
     if (!name || name.trim() === "" || !userName || userName.trim() === "")
       return errorHandler(res, 422, "All fields are required");
+
+    // if the fields are the same, no need to update
+    if (
+      name === req.user.name &&
+      userName === req.user.userName &&
+      color === req.user.color
+    )
+      return errorHandler(
+        res,
+        401,
+        "New user details must be different from  the current user details"
+      );
 
     // find the user with id and update
     const user = await User.findByIdAndUpdate(
@@ -252,6 +264,136 @@ export const updateProfile = async (req, res, next) => {
         profileSetup: user.profileSetup,
         avatar: user.avatar,
         color: user.color,
+        noAvatar: user.noAvatar,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAvatar = async (req, res, next) => {
+  try {
+    const { avatar } = req.files;
+
+    // check if theres is an avatar
+    if (!avatar) return errorHandler(res, 422, "Please provide a valid avatar");
+    // check if the user is uploading multiple files
+    if (Array.isArray(avatar))
+      return errorHandler(
+        res,
+        422,
+        "Access denied: Multiple files not allowed"
+      );
+    // check if the file uploaded is an image
+    if (!avatar.mimetype?.startsWith("image"))
+      return errorHandler(
+        res,
+        422,
+        "Invalid image format. File must be an image(.jpg, .png, .jpeg"
+      );
+    // check again if user is logged in
+    if (!req.user) return errorHandler(res, 403, "Unauthorized access");
+
+    // get the user
+    const user = await User.findById(req.user.id);
+    if (!user) return errorHandler(res, 404, "User not found");
+
+    // delete the old avatar from the cloudinary db
+    if (user.avatar?.id) {
+      const folderPath = `letsChatAvatars/${user.userName}`;
+      await cloudApi.delete_resources_by_prefix(folderPath);
+      // or
+      // await cloudApi.delete_folder(folderPath);
+    }
+
+    // upload the new avatar to the cloudinary db
+
+    // create a folder and subfolder for each user
+    const folderPath = `letsChatAvatars/${user.userName}`;
+
+    // upload to cloudinary
+    await cloudUploader.upload(
+      avatar.filepath,
+      {
+        folder: folderPath,
+        transformation: {
+          width: 600,
+          height: 600,
+          crop: "thumb",
+          gravity: "face",
+        },
+      },
+      async (error, result) => {
+        if (error) return errorHandler(res, 401, error.message);
+
+        // save the image url and id to the database
+        const publicId = result.public_id; //'letsChatAvatars/Deacon/uuyfbrcdhgdwxc7wymvm',
+
+        const imageId = publicId.split("/").pop();
+        const imageUrl = result.secure_url;
+
+        user.avatar.id = imageId;
+        user.avatar.url = imageUrl;
+
+        await user.save();
+      }
+    );
+
+    // console.log(avatar);
+    // response
+    res.status(200).json({
+      success: true,
+      message: "Avatar Updated",
+      profile: {
+        id: user.id,
+        name: user.name,
+        userName: user.userName,
+        email: user.email,
+        verified: user.verified,
+        profileSetup: user.profileSetup,
+        avatar: user.avatar,
+        color: user.color,
+        noAvatar: user.noAvatar,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteAvatar = async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        avatar: {},
+      },
+      { new: true }
+    );
+
+    if (!user) return errorHandler(res, 404, "User not found");
+
+    // delete theavatar from the cloudinary db
+
+    const folderPath = `letsChatAvatars/${user.userName}`;
+    await cloudApi.delete_resources_by_prefix(folderPath);
+    // or
+    // await cloudApi.delete_folder(folderPath);
+
+    res.status(200).json({
+      success: true,
+      message: "Profile Image deleted",
+      profile: {
+        id: user.id,
+        name: user.name,
+        userName: user.userName,
+        email: user.email,
+        verified: user.verified,
+        profileSetup: user.profileSetup,
+        avatar: user.avatar,
+        color: user.color,
+        noAvatar: user.noAvatar,
       },
     });
   } catch (error) {

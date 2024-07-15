@@ -1,6 +1,6 @@
+import jwt from "jsonwebtoken";
 import { errorHandler } from "../utils/error.js";
 import User from "../models/user.model.js";
-import jwt from "jsonwebtoken";
 
 // Middleware to check for access token: I.E IF USER IS SIGNED IN
 export const checkAuth = async (req, res, next) => {
@@ -25,6 +25,7 @@ export const checkAuth = async (req, res, next) => {
       profileSetup: user.profileSetup,
       avatar: user.avatar,
       color: user.color,
+      noAvatar: user.noAvatar,
     };
 
     next();

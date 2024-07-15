@@ -14,7 +14,7 @@ const app = express();
 app.use(
   cors({
     origin: process.env.FRONTEND_URL,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
     credentials: true,
   })
 );
@@ -23,6 +23,8 @@ app.use(
 app.use(express.json());
 // to allow cookie parsing
 app.use(cookieParser());
+// to send form from backend
+app.use(express.urlencoded({ extended: false }));
 
 // ROUTES
 app.use("/api/auth", authRouter);

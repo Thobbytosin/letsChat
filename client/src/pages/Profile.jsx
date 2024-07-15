@@ -1,13 +1,22 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../store";
 import Spinner from "./ui/Spinner";
-import { colors, colorsBg, getColor } from "../utils/colors.js";
-import { AiOutlinePlus, AiOutlineDelete } from "react-icons/ai";
+import { colorsBg, colorsCodes, getColor } from "../utils/colors.js";
+import { AiFillCamera } from "react-icons/ai";
 import toast from "react-hot-toast";
 import client from "../lib/client";
-import { UPDATE_USERINFO_ROUTE } from "../utils/constants";
+import {
+  DELETE_USERAVATAR_ROUTE,
+  UPDATE_USERAVATAR_ROUTE,
+  UPDATE_USERINFO_ROUTE,
+} from "../utils/constants";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineArrowLeft } from "react-icons/ai";
+import ImageModal from "../components/ImageModal";
+import BottomSlider from "./ui/BottomSlider";
+import CameraWindow from "./ui/CameraWindow";
+import DeleteModal from "../components/DeleteModal";
+import BackButton from "./ui/BackButton";
 
 const Profile = () => {
   const { userInfo, setUserInfo } = useAppStore();
@@ -15,20 +24,31 @@ const Profile = () => {
   const initialValues = {
     name: userInfo.name || "",
     userName: userInfo.userName,
-    color: selectedColor,
+    color: userInfo.color ? userInfo.color : selectedColor,
   };
   const [formData, setFormData] = useState(initialValues);
-  const [hovered, setHovered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [success, setSuccess] = useState(false);
   const [image, setImage] = useState(null);
   const [enterNameError, setEnterNameError] = useState(false);
   const [userNameError, setUserNameError] = useState(false);
+  const [bottomSlider, setBottomSlider] = useState(false);
+  const [imageModal, setImageModal] = useState(false);
+  const [openCamera, setOpenCamera] = useState(false);
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    setSelectedColor(userInfo.color);
+    if (userInfo.color) {
+      setSelectedColor(userInfo.color);
+    }
+    if (userInfo.avatar?.url) {
+      setImage(userInfo.avatar?.url);
+    } else {
+      setImage(userInfo.noAvatar);
+    }
   }, [userInfo]);
 
   const validateData = () => {
@@ -109,7 +129,7 @@ const Profile = () => {
     }
   };
 
-  // handle Navigate
+  // handle Navigate back to chats
   const handleNavigate = () => {
     if (userInfo.profileSetup) {
       navigate("/chats");
@@ -118,41 +138,106 @@ const Profile = () => {
     }
   };
 
+  // PROFILE IMAGE FUNCTIONS
+
+  const handleFileInputClick = () => {
+    setBottomSlider(false);
+
+    fileInputRef.current.click();
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+
+    if (file) {
+      const form = new FormData();
+      form.append("avatar", file);
+
+      try {
+        setLoading(true);
+        const { data } = await client.patch(UPDATE_USERAVATAR_ROUTE, form, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          withCredentials: true,
+        });
+
+        if (data.success) {
+          setUserInfo(data.profile);
+          toast.success(data.message);
+        }
+      } catch (error) {
+        toast.error(error.response.data.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleImageDelete = async (e) => {
+    setBottomSlider(false);
+    setOpenDeleteModal(false);
+
+    try {
+      setLoading(true);
+
+      const { data } = await client.get(DELETE_USERAVATAR_ROUTE, {
+        withCredentials: true,
+      });
+      if (data.success) {
+        setUserInfo(data.profile);
+        toast.success(data.message);
+      }
+    } catch (error) {
+      toast(error.response.data.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="profilBg relative  w-screen h-screen flex justify-center items-center font-poppins">
+    <div className="profilBg relative w-screen h-screen flex justify-center items-center font-poppins">
       {/* OVERLAY */}
       <div className=" absolute left-0 top-0 w-screen h-screen bg-backgroundGray bg-opacity-65" />
 
-      <button onClick={handleNavigate} className=" absolute left-6 top-6">
-        <AiOutlineArrowLeft size={24} />
-      </button>
+      {/* BACK BUTTON */}
+      <BackButton navigate={handleNavigate} />
 
       <div className=" z-10">
         <div className=" flex justify-center items-center gap-6">
           {/* AVATAR */}
           <div
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            className={`relative w-24 h-24 overflow-clip rounded-full p-1 cursor-pointer border-2 ${getColor(
+            className={`relative w-24 h-24  rounded-full p-1 cursor-pointer border-2 ${getColor(
               selectedColor
             )} `}
           >
-            <div className=" w-full h-full overflow-clip border-transparent rounded-full">
-              <img
-                src={image || userInfo.avatar}
-                alt="avatr"
-                className=" object-cover"
-              />
+            <div
+              onClick={() => setImageModal(true)}
+              className=" cursor-pointer w-full h-full overflow-clip border-transparent rounded-full"
+            >
+              <img src={image} alt="avatar" className=" object-cover" />
             </div>
-            {hovered && (
-              <div className=" bg-black bg-opacity-10 w-full h-full absolute left-0 top-0 flex items-center justify-center transition-all duration-1000">
-                {image ? <AiOutlineDelete /> : <AiOutlinePlus size={38} />}
-              </div>
-            )}
+            <div
+              onClick={() => setBottomSlider((prev) => !prev)}
+              className={`cursor-pointer absolute bottom-0 -right-3 w-8 h-8 rounded-full flex justify-center items-center bg-white ${getColor(
+                selectedColor
+              )}`}
+            >
+              <AiFillCamera color="#000" />
+            </div>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              className=" hidden"
+              onChange={handleImageChange}
+              name="avatar"
+              accept="image/*"
+            />
           </div>
 
           {/* FORM */}
-          <div>
+          <div onClick={() => setBottomSlider(false)}>
             <form onSubmit={handleSubmit}>
               {/* EMAIL INPUT */}
               <div>
@@ -240,13 +325,56 @@ const Profile = () => {
 
         {/* if error is true */}
         {error && (
-          <p className=" mt-3 text-warning text-sm text-center">{error}</p>
+          <p className=" mt-3 px-6 text-warning text-sm text-center">{error}</p>
         )}
         {/* if success is true */}
         {success && (
           <p className=" mt-3 text-success text-sm text-center">{success}</p>
         )}
       </div>
+
+      {/* BOTTOM SLIDER */}
+
+      <BottomSlider
+        bottomSlider={bottomSlider}
+        color={colorsCodes[userInfo.color ? userInfo.color : selectedColor]}
+        closeSlider={() => setBottomSlider(false)}
+        selectImage={handleFileInputClick}
+        openCamera={() => {
+          setBottomSlider(false);
+          setOpenCamera(true);
+        }}
+        openDeleteModal={() => setOpenDeleteModal(true)}
+        isAvatarActive={userInfo.avatar?.url}
+      />
+
+      {/* CAMERA */}
+      {openCamera && <CameraWindow closeCamera={() => setOpenCamera(false)} />}
+
+      {/* MODAL */}
+      {imageModal && (
+        <ImageModal
+          image={image}
+          close={() => {
+            setBottomSlider(false);
+            setImageModal(false);
+          }}
+          closeBottomSlider={() => setBottomSlider(false)}
+          toggleBottomSlider={() => setBottomSlider((prev) => !prev)}
+          loading={loading}
+        />
+      )}
+
+      {/* DELETE MODAL */}
+      {openDeleteModal && (
+        <DeleteModal
+          closeModal={() => {
+            setBottomSlider(false);
+            setOpenDeleteModal(false);
+          }}
+          deleteImage={handleImageDelete}
+        />
+      )}
 
       {/* loading spinner */}
       {loading && <Spinner />}
